@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 function App() {
@@ -10,57 +9,58 @@ function App() {
     amount: '',
   });
 
-  // États pour la liste des transactions
+  // États pour la liste des transactions (simulées)
   const [transactions, setTransactions] = useState([]);
 
   // État pour l'année de la balance comptable
   const [year, setYear] = useState('');
 
-  // Récupérer les transactions depuis le backend
-  useEffect(() => {
-    axios.get('http://localhost:8000/api/transactions/')
-      .then(response => {
-        setTransactions(response.data);
-      })
-      .catch(error => {
-        console.error('Erreur lors de la récupération des transactions', error);
-      });
-  }, []);
-
   // Gérer la soumission du formulaire
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    try {
-      await axios.post('http://localhost:8000/api/transactions/', formData);
-      alert('Transaction créée avec succès !');
-      setFormData({ date: '', category: '', amount: '' });
-      // Recharger la liste des transactions après création
-      const response = await axios.get('http://localhost:8000/api/transactions/');
-      setTransactions(response.data);
-    } catch (error) {
-      console.error('Erreur lors de la création de la transaction', error);
-    }
+    // Ajouter la nouvelle transaction à la liste
+    const newTransaction = { ...formData, id: Date.now() };
+    setTransactions([...transactions, newTransaction]);
+    alert('Transaction créée avec succès !');
+    setFormData({ date: '', category: '', amount: '' });
   };
 
-  // Gérer le téléchargement de la balance comptable
-  const handleDownloadBalance = async () => {
+  // Gérer le téléchargement de la balance comptable (simulé)
+  const handleDownloadBalance = () => {
     if (!year) {
       alert('Veuillez saisir une année valide.');
       return;
     }
-    try {
-      const response = await axios.get(`http://localhost:8000/api/balance/${year}/`, {
-        responseType: 'blob',
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `balance_${year}.csv`);
-      document.body.appendChild(link);
-      link.click();
-    } catch (error) {
-      console.error('Erreur lors du téléchargement de la balance', error);
-    }
+
+    // Filtrer les transactions par année
+    const filteredTransactions = transactions.filter(
+      (transaction) => new Date(transaction.date).getFullYear() === parseInt(year)
+    );
+
+    // Calculer la balance comptable
+    const balance = filteredTransactions.reduce((acc, transaction) => {
+      if (!acc[transaction.category]) {
+        acc[transaction.category] = 0;
+      }
+      acc[transaction.category] += parseFloat(transaction.amount);
+      return acc;
+    }, {});
+
+    // Convertir la balance en CSV
+    const csvContent = Object.entries(balance)
+      .map(([category, total]) => `${category},${total}`)
+      .join('\n');
+
+    // Créer un fichier CSV et le télécharger
+    const blob = new Blob([`Catégorie comptable,Total des montants\n${csvContent}`], {
+      type: 'text/csv',
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `balance_${year}.csv`);
+    document.body.appendChild(link);
+    link.click();
   };
 
   return (
@@ -124,7 +124,7 @@ function App() {
               </tr>
             </thead>
             <tbody>
-              {transactions.map(transaction => (
+              {transactions.map((transaction) => (
                 <tr key={transaction.id}>
                   <td>{transaction.date}</td>
                   <td>{transaction.category}</td>
